@@ -12,24 +12,24 @@ import cp1.base.TransactionManager;
 import cp1.base.UnknownResourceIdException;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Semaphore;
 
 public class TransactionManagerImpl implements TransactionManager {
 
-    private final Map<Thread, Transaction> threadTransactionMap;
-    private final HashMap<Resource, Semaphore> resources;
+    private final ConcurrentMap<Thread, Transaction> threadTransactionMap;
+    private final ConcurrentMap<Resource, Semaphore> resources;
     private final LocalTimeProvider timeProvider;
 
     public TransactionManagerImpl(Collection<Resource> resources, LocalTimeProvider localTimeProvider) {
-        this.resources = new HashMap<>();
+        this.resources = new ConcurrentHashMap<>();
         for (Resource resource : resources) {
             this.resources.put(resource, new Semaphore(1));
         }
         this.timeProvider = localTimeProvider;
-        this.threadTransactionMap = new HashMap<>();
+        this.threadTransactionMap = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -60,7 +60,9 @@ public class TransactionManagerImpl implements TransactionManager {
             throw new ActiveTransactionAborted();
         }
         if (!transaction.isAccessAcquiredForResource(resource)) {
+
             // todo: handle deadlocks
+            System.err.println("Thread: " + currentThread.getName() + " waiting for " + rid);
             resources.get(resource).acquire();
             transaction.newAcquiredResource(resource);
         }
@@ -96,6 +98,9 @@ public class TransactionManagerImpl implements TransactionManager {
         List<Resource> operatedResources = transaction.getOperatedResources();
         for (int i = finishedOperations.size() - 1; i >= 0; i--) {
             operatedResources.get(i).unapply(finishedOperations.get(i));
+        }
+        for (Resource resource : transaction.getAcquiredResources()) {
+            resources.get(resource).release();
         }
         threadTransactionMap.remove(Thread.currentThread());
     }
