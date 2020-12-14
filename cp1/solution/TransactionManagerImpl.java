@@ -15,21 +15,25 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Semaphore;
 
 public class TransactionManagerImpl implements TransactionManager {
 
     private final ConcurrentMap<Thread, Transaction> threadTransactionMap;
-    private final ConcurrentMap<Resource, Semaphore> resources;
+    private final ConcurrentMap<ResourceId, Resource> resources;
+    private final ConcurrentMap<ResourceId, Transaction> resourceOwners;
     private final LocalTimeProvider timeProvider;
+
+    private final AllocationGraph resourceAllocationGraph;
 
     public TransactionManagerImpl(Collection<Resource> resources, LocalTimeProvider localTimeProvider) {
         this.resources = new ConcurrentHashMap<>();
         for (Resource resource : resources) {
-            this.resources.put(resource, new Semaphore(1));
+            this.resources.put(resource.getId(), resource);
         }
         this.timeProvider = localTimeProvider;
         this.threadTransactionMap = new ConcurrentHashMap<>();
+        this.resourceAllocationGraph = new AllocationGraph(resources);
+        this.resourceOwners = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -38,7 +42,8 @@ public class TransactionManagerImpl implements TransactionManager {
         if (threadTransactionMap.containsKey(currentThread)) {
             throw new AnotherTransactionActiveException();
         }
-        threadTransactionMap.put(currentThread, new Transaction());
+        Transaction transaction = new Transaction(currentThread, timeProvider.getTime());
+        threadTransactionMap.put(currentThread, transaction);
     }
 
     @Override
@@ -52,22 +57,23 @@ public class TransactionManagerImpl implements TransactionManager {
             throw new NoActiveTransactionException();
         }
         Transaction transaction = threadTransactionMap.get(currentThread);
-        Resource resource = getResourceWithIdOrNull(rid);
-        if (resource == null) {
+        if (!resources.containsKey(rid)) {
             throw new UnknownResourceIdException(rid);
         }
         if (threadTransactionMap.get(currentThread).isAborted()) {
             throw new ActiveTransactionAborted();
         }
-        if (!transaction.isAccessAcquiredForResource(resource)) {
-
-            // todo: handle deadlocks
-            System.err.println("Thread: " + currentThread.getName() + " waiting for " + rid);
-            resources.get(resource).acquire();
-            transaction.newAcquiredResource(resource);
+        if (!transaction.wasAccessAcquiredForResource(rid)) {
+            if (resourceOwners.containsKey(rid)) {
+                resourceAllocationGraph.addEdge(transaction, resourceOwners.get(rid), rid);
+                resourceAllocationGraph.detectCycle(transaction); // extra: change to resource
+                transaction.getSemaphore().acquire();
+            }
+            transaction.newAcquiredResource(rid);
+            resourceOwners.put(rid, transaction);
         }
-        resource.apply(operation);
-        transaction.finishedOperationOnTheResource(resource, operation);
+        resources.get(rid).apply(operation);
+        transaction.finishedOperationOnTheResource(rid, operation);
     }
 
     @Override
@@ -81,28 +87,34 @@ public class TransactionManagerImpl implements TransactionManager {
             throw new ActiveTransactionAborted();
         }
         Transaction transaction = threadTransactionMap.get(currentThread);
-        for (Resource resource : transaction.getAcquiredResources()) {
-            resources.get(resource).release();
+        resourceAllocationGraph.removeNode(transaction);
+        for (ResourceId rid : transaction.getAcquiredResources()) {
+            if (resourceOwners.get(rid).getThread().equals(currentThread)) {
+                resourceOwners.remove(rid);
+            }
         }
         threadTransactionMap.remove(currentThread);
     }
 
     @Override
     public void rollbackCurrentTransaction() {
-        Thread thread = Thread.currentThread();
-        if (!threadTransactionMap.containsKey(thread)) {
+        Thread currentThread = Thread.currentThread();
+        if (!threadTransactionMap.containsKey(currentThread)) {
             return;
         }
-        Transaction transaction = threadTransactionMap.get(thread);
+        Transaction transaction = threadTransactionMap.get(currentThread);
         List<ResourceOperation> finishedOperations = transaction.getFinishedOperations();
-        List<Resource> operatedResources = transaction.getOperatedResources();
+        List<ResourceId> operatedResources = transaction.getOperatedResources();
         for (int i = finishedOperations.size() - 1; i >= 0; i--) {
-            operatedResources.get(i).unapply(finishedOperations.get(i));
+            resources.get(operatedResources.get(i)).unapply(finishedOperations.get(i));
         }
-        for (Resource resource : transaction.getAcquiredResources()) {
-            resources.get(resource).release();
+        resourceAllocationGraph.removeNode(transaction);
+        for (ResourceId rid : transaction.getAcquiredResources()) {
+            if (resourceOwners.get(rid).getThread().equals(currentThread)) {
+                resourceOwners.remove(rid);
+            }
         }
-        threadTransactionMap.remove(Thread.currentThread());
+        threadTransactionMap.remove(currentThread);
     }
 
     @Override
@@ -115,14 +127,5 @@ public class TransactionManagerImpl implements TransactionManager {
     public boolean isTransactionAborted() {
         return threadTransactionMap.containsKey(Thread.currentThread())
                 && threadTransactionMap.get(Thread.currentThread()).isAborted();
-    }
-
-    private Resource getResourceWithIdOrNull(ResourceId rid) {
-        for (Resource resource : resources.keySet()) {
-            if (resource.getId().equals(rid)) {
-                return resource;
-            }
-        }
-        return null;
     }
 }
