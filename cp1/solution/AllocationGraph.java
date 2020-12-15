@@ -33,12 +33,12 @@ public class AllocationGraph {
         }
     }
 
-    public void addEdge(Transaction from, Transaction to, ResourceId rid) {
+    public synchronized void addEdge(Transaction from, Transaction to, ResourceId rid) {
         resourceAllocationGraph.putIfAbsent(from, to);
         resourceWaitingQueue.get(rid).add(from);
     }
 
-    public void removeNode(Transaction node) {
+    public synchronized void removeNode(Transaction node) {
         for (ResourceId rid: node.getAcquiredResources()) {
             if (resourceWaitingQueue.get(rid).isEmpty()) {
                 resourceOwners.remove(rid);
@@ -54,7 +54,7 @@ public class AllocationGraph {
         resourceAllocationGraph.remove(node);
     }
 
-    public void detectCycle(Transaction start) {
+    public synchronized void detectCycle(Transaction start) {
         Stack<Transaction> stack = new Stack<>();
         Map<Transaction, Node> visited = new HashMap<>();
         for (Transaction transaction : resourceAllocationGraph.keySet()) {
