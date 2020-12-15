@@ -24,18 +24,26 @@ public class AllocationGraph {
     private final ConcurrentMap<ResourceId, Queue<Transaction>> resourceWaitingQueue;
     private final ConcurrentMap<ResourceId, Transaction> resourceOwners;
 
-    public AllocationGraph(Collection<Resource> resources, ConcurrentMap<ResourceId, Transaction> resourceOwners) {
+    public AllocationGraph(Collection<Resource> resources) {
         this.resourceAllocationGraph = new ConcurrentHashMap<>();
         this.resourceWaitingQueue = new ConcurrentHashMap<>();
-        this.resourceOwners = resourceOwners;
+        this.resourceOwners = new ConcurrentHashMap<>();
         for (Resource resource : resources) {
             resourceWaitingQueue.putIfAbsent(resource.getId(), new ConcurrentLinkedQueue<>());
         }
     }
 
-    public synchronized void addEdge(Transaction from, Transaction to, ResourceId rid) {
-        resourceAllocationGraph.putIfAbsent(from, to);
-        resourceWaitingQueue.get(rid).add(from);
+    public synchronized boolean addEdgeIfNecessary(Transaction from, ResourceId rid) {
+        if (resourceOwners.containsKey(rid)) {
+            Transaction to = resourceOwners.get(rid);
+            resourceAllocationGraph.putIfAbsent(from, to);
+            resourceWaitingQueue.get(rid).add(from);
+            detectCycle(from);
+            return true;
+        } else {
+            resourceOwners.put(rid, from);
+            return false;
+        }
     }
 
     public synchronized void removeNode(Transaction node) {
@@ -48,13 +56,14 @@ public class AllocationGraph {
             for (Transaction remaining : resourceWaitingQueue.get(rid)) {
                 resourceAllocationGraph.replace(remaining, next);
             }
+            resourceOwners.replace(rid, next);
             resourceAllocationGraph.remove(next);
             next.getSemaphore().release();
         }
         resourceAllocationGraph.remove(node);
     }
 
-    public synchronized void detectCycle(Transaction start) {
+    private void detectCycle(Transaction start) {
         Stack<Transaction> stack = new Stack<>();
         Map<Transaction, Node> visited = new HashMap<>();
         for (Transaction transaction : resourceAllocationGraph.keySet()) {

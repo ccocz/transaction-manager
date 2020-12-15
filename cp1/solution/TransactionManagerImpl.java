@@ -20,7 +20,6 @@ public class TransactionManagerImpl implements TransactionManager {
 
     private final ConcurrentMap<Thread, Transaction> threadTransactionMap;
     private final ConcurrentMap<ResourceId, Resource> resources;
-    private final ConcurrentMap<ResourceId, Transaction> resourceOwners;
     private final LocalTimeProvider timeProvider;
 
     private final AllocationGraph resourceAllocationGraph;
@@ -32,8 +31,7 @@ public class TransactionManagerImpl implements TransactionManager {
         }
         this.timeProvider = localTimeProvider;
         this.threadTransactionMap = new ConcurrentHashMap<>();
-        this.resourceOwners = new ConcurrentHashMap<>();
-        this.resourceAllocationGraph = new AllocationGraph(resources, resourceOwners);
+        this.resourceAllocationGraph = new AllocationGraph(resources);
     }
 
     @Override
@@ -65,14 +63,13 @@ public class TransactionManagerImpl implements TransactionManager {
             throw new ActiveTransactionAborted();
         }
         if (!transaction.wasAccessAcquiredForResource(rid)) {
-            if (resourceOwners.containsKey(rid)) {
-                resourceAllocationGraph.addEdge(transaction, resourceOwners.get(rid), rid);
-                resourceAllocationGraph.detectCycle(transaction);
+            if (resourceAllocationGraph.addEdgeIfNecessary(transaction, rid)) {
+                System.err.println(currentThread.getName() + " is waiting for " + rid);
                 transaction.getSemaphore().acquire();
             }
             transaction.newAcquiredResource(rid);
-            resourceOwners.put(rid, transaction);
         }
+        System.err.println(currentThread.getName() + " is using " + rid);
         resources.get(rid).apply(operation);
         transaction.finishedOperationOnTheResource(rid, operation);
     }
