@@ -20,10 +20,12 @@ public class AllocationGraph {
 
     private final ConcurrentMap<Transaction, Transaction> resourceAllocationGraph;
     private final ConcurrentMap<ResourceId, Queue<Transaction>> resourceWaitingQueue;
+    private final ConcurrentMap<ResourceId, Transaction> resourceOwners;
 
-    public AllocationGraph(Collection<Resource> resources) {
+    public AllocationGraph(Collection<Resource> resources, ConcurrentMap<ResourceId, Transaction> resourceOwners) {
         this.resourceAllocationGraph = new ConcurrentHashMap<>();
         this.resourceWaitingQueue = new ConcurrentHashMap<>();
+        this.resourceOwners = resourceOwners;
         for (Resource resource : resources) {
             resourceWaitingQueue.putIfAbsent(resource.getId(), new ConcurrentLinkedQueue<>());
         }
@@ -37,12 +39,14 @@ public class AllocationGraph {
     public void removeNode(Transaction node) {
         for (ResourceId rid: node.getAcquiredResources()) {
             if (resourceWaitingQueue.get(rid).isEmpty()) {
+                resourceOwners.remove(rid);
                 continue;
             }
             Transaction next = resourceWaitingQueue.get(rid).remove();
             for (Transaction remaining : resourceWaitingQueue.get(rid)) {
                 resourceAllocationGraph.put(remaining, next);
             }
+            resourceOwners.replace(rid, next);
             next.getSemaphore().release();
         }
         resourceAllocationGraph.remove(node);
@@ -61,7 +65,7 @@ public class AllocationGraph {
         stack.push(start);
         visited.put(start, Node.IN_STACK);
         Transaction adj = resourceAllocationGraph.get(start);
-        if (adj.isAborted()) {
+        if (adj == null || adj.isAborted()) {
             visited.put(stack.pop(), Node.DONE);
             return;
         }

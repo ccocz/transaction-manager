@@ -9,8 +9,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 
-//todo: przerywanie, anulowanie
-
 public class Transaction {
 
     private boolean isAborted;
@@ -85,10 +83,10 @@ public class Transaction {
 
     @Override
     public boolean equals(Object obj) {
-        if (! (obj instanceof Transaction)) {
+        if (!(obj instanceof Transaction)) {
             return false;
         }
-        return this.thread.getId() == ((Transaction) obj).thread.getId();
+        return this.thread.getId() == ((Transaction)obj).thread.getId();
     }
 
     @Override

@@ -32,8 +32,8 @@ public class TransactionManagerImpl implements TransactionManager {
         }
         this.timeProvider = localTimeProvider;
         this.threadTransactionMap = new ConcurrentHashMap<>();
-        this.resourceAllocationGraph = new AllocationGraph(resources);
         this.resourceOwners = new ConcurrentHashMap<>();
+        this.resourceAllocationGraph = new AllocationGraph(resources, resourceOwners);
     }
 
     @Override
@@ -67,11 +67,13 @@ public class TransactionManagerImpl implements TransactionManager {
             if (resourceOwners.containsKey(rid)) {
                 resourceAllocationGraph.addEdge(transaction, resourceOwners.get(rid), rid);
                 resourceAllocationGraph.detectCycle(transaction); // extra: change to resource
+                System.err.println(currentThread.getName() + " is waiting for " + rid);
                 transaction.getSemaphore().acquire();
             }
             transaction.newAcquiredResource(rid);
             resourceOwners.put(rid, transaction);
         }
+        System.err.println(currentThread.getName() + " is operating on " + rid);
         resources.get(rid).apply(operation);
         transaction.finishedOperationOnTheResource(rid, operation);
     }
@@ -88,11 +90,6 @@ public class TransactionManagerImpl implements TransactionManager {
         }
         Transaction transaction = threadTransactionMap.get(currentThread);
         resourceAllocationGraph.removeNode(transaction);
-        for (ResourceId rid : transaction.getAcquiredResources()) {
-            if (resourceOwners.get(rid).getThread().equals(currentThread)) {
-                resourceOwners.remove(rid);
-            }
-        }
         threadTransactionMap.remove(currentThread);
     }
 
@@ -109,11 +106,6 @@ public class TransactionManagerImpl implements TransactionManager {
             resources.get(operatedResources.get(i)).unapply(finishedOperations.get(i));
         }
         resourceAllocationGraph.removeNode(transaction);
-        for (ResourceId rid : transaction.getAcquiredResources()) {
-            if (resourceOwners.get(rid).getThread().equals(currentThread)) {
-                resourceOwners.remove(rid);
-            }
-        }
         threadTransactionMap.remove(currentThread);
     }
 
