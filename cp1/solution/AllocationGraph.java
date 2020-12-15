@@ -66,7 +66,7 @@ public class AllocationGraph {
             return;
         }
         if (visited.get(adj) == Node.IN_STACK) {
-            handleCycle(stack, start);
+            handleCycle(stack, adj);
         } else if (visited.get(adj) == Node.NOT_VISITED) {
             dfs(adj, stack, visited);
         }
