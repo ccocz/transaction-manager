@@ -47,7 +47,8 @@ public class TransactionManagerImpl implements TransactionManager {
     }
 
     @Override
-    public void operateOnResourceInCurrentTransaction(ResourceId rid, ResourceOperation operation) throws NoActiveTransactionException,
+    public void operateOnResourceInCurrentTransaction(ResourceId rid, ResourceOperation operation)
+            throws NoActiveTransactionException,
             UnknownResourceIdException,
             ActiveTransactionAborted,
             ResourceOperationException,
@@ -66,14 +67,12 @@ public class TransactionManagerImpl implements TransactionManager {
         if (!transaction.wasAccessAcquiredForResource(rid)) {
             if (resourceOwners.containsKey(rid)) {
                 resourceAllocationGraph.addEdge(transaction, resourceOwners.get(rid), rid);
-                resourceAllocationGraph.detectCycle(transaction); // extra: change to resource
-                System.err.println(currentThread.getName() + " is waiting for " + rid);
+                resourceAllocationGraph.detectCycle(transaction);
                 transaction.getSemaphore().acquire();
             }
             transaction.newAcquiredResource(rid);
             resourceOwners.put(rid, transaction);
         }
-        System.err.println(currentThread.getName() + " is operating on " + rid);
         resources.get(rid).apply(operation);
         transaction.finishedOperationOnTheResource(rid, operation);
     }

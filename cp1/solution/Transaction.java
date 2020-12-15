@@ -26,7 +26,7 @@ public class Transaction {
         this.isActive = true;
         this.isAborted = false;
         this.acquiredResources = new HashSet<>();
-        this.operatedResources = new ArrayList<>(); //todo: change to synchronized
+        this.operatedResources = new ArrayList<>();
         this.finishedOperations = new ArrayList<>();
         this.semaphore = new Semaphore(0);
     }

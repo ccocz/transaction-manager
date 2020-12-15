@@ -4,6 +4,8 @@ import cp1.base.Resource;
 import cp1.base.ResourceId;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
@@ -44,24 +46,24 @@ public class AllocationGraph {
             }
             Transaction next = resourceWaitingQueue.get(rid).remove();
             for (Transaction remaining : resourceWaitingQueue.get(rid)) {
-                resourceAllocationGraph.put(remaining, next);
+                resourceAllocationGraph.replace(remaining, next);
             }
-            resourceOwners.replace(rid, next);
+            resourceAllocationGraph.remove(next);
             next.getSemaphore().release();
         }
         resourceAllocationGraph.remove(node);
     }
 
     public void detectCycle(Transaction start) {
-        Stack<Transaction> stack = new Stack<>(); // todo: multi-thread version
-        ConcurrentMap<Transaction, Node> visited = new ConcurrentHashMap<>();
+        Stack<Transaction> stack = new Stack<>();
+        Map<Transaction, Node> visited = new HashMap<>();
         for (Transaction transaction : resourceAllocationGraph.keySet()) {
             visited.put(transaction, Node.NOT_VISITED);
         }
         dfs(start, stack, visited);
     }
 
-    private void dfs(Transaction start, Stack<Transaction> stack, ConcurrentMap<Transaction, Node> visited) {
+    private void dfs(Transaction start, Stack<Transaction> stack, Map<Transaction, Node> visited) {
         stack.push(start);
         visited.put(start, Node.IN_STACK);
         Transaction adj = resourceAllocationGraph.get(start);
