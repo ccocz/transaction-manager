@@ -64,12 +64,10 @@ public class TransactionManagerImpl implements TransactionManager {
         }
         if (!transaction.wasAccessAcquiredForResource(rid)) {
             if (resourceAllocationGraph.addEdgeIfNecessary(transaction, rid)) {
-                System.err.println(currentThread.getName() + " is waiting for " + rid);
                 transaction.getSemaphore().acquire();
             }
             transaction.newAcquiredResource(rid);
         }
-        System.err.println(currentThread.getName() + " is using " + rid);
         resources.get(rid).apply(operation);
         transaction.finishedOperationOnTheResource(rid, operation);
     }

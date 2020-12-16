@@ -7,11 +7,11 @@
  */
 package cp1.solution;
 
-import java.util.Collection;
-
-import cp1.base.TransactionManager;
 import cp1.base.LocalTimeProvider;
 import cp1.base.Resource;
+import cp1.base.TransactionManager;
+
+import java.util.Collection;
 
 /**
  * A factory for instantiating transaction managers.
@@ -36,8 +36,6 @@ public final class TransactionManagerFactory {
 			LocalTimeProvider timeProvider
 	) {
 		return new TransactionManagerImpl(resources, timeProvider);
-		// FIXME: implement
-		// throw new AssertionError("UNIMPLEMENTED!");
 	}
 	
 }

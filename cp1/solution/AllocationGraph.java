@@ -98,7 +98,7 @@ public class AllocationGraph {
         stack.push(toBeCancelled);
         while (!cycle.empty()) {
             Transaction transaction = cycle.pop();
-            if (transaction.getStartingTime() < toBeCancelled.getStartingTime()) {
+            if (transaction.getStartingTime() > toBeCancelled.getStartingTime()) {
                 toBeCancelled = transaction;
             } else if (transaction.getStartingTime() == toBeCancelled.getStartingTime()
                     && transaction.getThread().getId() > toBeCancelled.getThread().getId()) {
