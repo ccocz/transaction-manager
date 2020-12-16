@@ -107,8 +107,7 @@ public class TransactionManagerImpl implements TransactionManager {
 
     @Override
     public boolean isTransactionActive() {
-        return threadTransactionMap.containsKey(Thread.currentThread())
-                && threadTransactionMap.get(Thread.currentThread()).isActive();
+        return threadTransactionMap.containsKey(Thread.currentThread());
     }
 
     @Override

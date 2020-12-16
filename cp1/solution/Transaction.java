@@ -12,7 +12,6 @@ import java.util.concurrent.Semaphore;
 public class Transaction {
 
     private boolean isAborted;
-    private boolean isActive;
     private final Collection<ResourceId> acquiredResources;
     private final List<ResourceId> operatedResources;
     private final List<ResourceOperation> finishedOperations;
@@ -23,7 +22,6 @@ public class Transaction {
     public Transaction(Thread thread, long startingTime) {
         this.thread = thread;
         this.startingTime = startingTime;
-        this.isActive = true;
         this.isAborted = false;
         this.acquiredResources = new HashSet<>();
         this.operatedResources = new ArrayList<>();
@@ -33,10 +31,6 @@ public class Transaction {
 
     public boolean isAborted() {
         return isAborted;
-    }
-
-    public boolean isActive() {
-        return isActive;
     }
 
     public boolean wasAccessAcquiredForResource(ResourceId rid) {
@@ -74,7 +68,6 @@ public class Transaction {
 
     public void abort() {
         isAborted = true;
-        isActive = false;
     }
 
     public Semaphore getSemaphore() {

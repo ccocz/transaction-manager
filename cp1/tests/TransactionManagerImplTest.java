@@ -260,6 +260,10 @@ public class TransactionManagerImplTest {
         expectResourceValue(r1, 100);
     }
 
+    @Test
+    public void testIsTransactionActive() {
+        assert !tm.isTransactionActive();
+    }
 
 
     private final static void expectResourceValue(ResourceImpl r, long val) {
