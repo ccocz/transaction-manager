@@ -65,10 +65,12 @@ public class TransactionManagerImpl implements TransactionManager {
         if (!transaction.wasAccessAcquiredForResource(rid)) {
             if (resourceAllocationGraph.addEdgeIfNecessary(transaction, rid)) {
                 if (transaction.isAborted()) {
+                    currentThread.interrupt();
                     throw new ActiveTransactionAborted();
                 }
                 transaction.getSemaphore().acquire();
                 if (transaction.isAborted()) {
+                    currentThread.interrupt();
                     throw new ActiveTransactionAborted();
                 }
             }
