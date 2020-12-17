@@ -20,7 +20,7 @@ public class AllocationGraph {
         IN_STACK
     }
 
-    private final ConcurrentMap<Transaction, Transaction> resourceAllocationGraph;
+    private final ConcurrentMap<Transaction, ResourceId> resourceAllocationGraph;
     private final ConcurrentMap<ResourceId, Queue<Transaction>> resourceWaitingQueue;
     private final ConcurrentMap<ResourceId, Transaction> resourceOwners;
 
@@ -35,32 +35,33 @@ public class AllocationGraph {
 
     public synchronized boolean addEdgeIfNecessary(Transaction from, ResourceId rid) {
         if (resourceOwners.containsKey(rid)) {
-            Transaction to = resourceOwners.get(rid);
-            resourceAllocationGraph.putIfAbsent(from, to);
+            resourceAllocationGraph.putIfAbsent(from, rid);
             resourceWaitingQueue.get(rid).add(from);
             detectCycle(from);
             return true;
         } else {
             resourceOwners.put(rid, from);
+            from.newAcquiredResource(rid);
             return false;
         }
     }
 
     public synchronized void removeNode(Transaction node) {
+        if (resourceAllocationGraph.containsKey(node)) {
+            resourceWaitingQueue.get(resourceAllocationGraph.get(node)).remove(node);
+            resourceAllocationGraph.remove(node);
+        }
         for (ResourceId rid: node.getAcquiredResources()) {
             if (resourceWaitingQueue.get(rid).isEmpty()) {
                 resourceOwners.remove(rid);
                 continue;
             }
             Transaction next = resourceWaitingQueue.get(rid).remove();
-            for (Transaction remaining : resourceWaitingQueue.get(rid)) {
-                resourceAllocationGraph.replace(remaining, next);
-            }
             resourceOwners.replace(rid, next);
             resourceAllocationGraph.remove(next);
+            next.newAcquiredResource(rid);
             next.getSemaphore().release();
         }
-        resourceAllocationGraph.remove(node);
     }
 
     private void detectCycle(Transaction start) {
@@ -75,8 +76,9 @@ public class AllocationGraph {
     private void dfs(Transaction start, Stack<Transaction> stack, Map<Transaction, Node> visited) {
         stack.push(start);
         visited.put(start, Node.IN_STACK);
-        Transaction adj = resourceAllocationGraph.get(start);
-        if (adj == null || adj.isAborted()) {
+        ResourceId ridAdj = resourceAllocationGraph.get(start);
+        Transaction adj;
+        if (ridAdj == null || ((adj = resourceOwners.get(ridAdj)).isAborted())) {
             visited.put(stack.pop(), Node.DONE);
             return;
         }
@@ -91,7 +93,7 @@ public class AllocationGraph {
     private void handleCycle(Stack<Transaction> stack, Transaction start) {
         Stack<Transaction> cycle = new Stack<>();
         cycle.push(stack.pop());
-        while (cycle.peek() != start) {
+        while (!cycle.peek().equals(start)) {
             cycle.push(stack.pop());
         }
         Transaction toBeCancelled = cycle.pop();
@@ -107,7 +109,7 @@ public class AllocationGraph {
             stack.push(transaction);
         }
         toBeCancelled.abort();
-        toBeCancelled.getThread().interrupt();
+        toBeCancelled.getSemaphore().release();
     }
 
 }
