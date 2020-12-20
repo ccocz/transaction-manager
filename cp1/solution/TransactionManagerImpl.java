@@ -16,6 +16,11 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * Transaction Manager implementation
+ *
+ * @author Resul Hangeldiyev
+ */
 public class TransactionManagerImpl implements TransactionManager {
 
     private final ConcurrentMap<Thread, Transaction> threadTransactionMap;

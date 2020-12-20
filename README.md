@@ -1,0 +1,3 @@
+# Concurrent Transaction Manager
+
+A transaction is a sequence of operations that constitute a whole and as such must be performed indivisibly and in isolation. Integrity means that either all operations in the sequence constituting the transaction will be performed, or none of them will be performed. Isolation, on the other hand, means that the results of individual operations from the sequence of a given transaction are not visible for operations from other transactions until the entire sequence of a given transaction is completed. Ensuring indivisibility and isolation is the goal of the transaction manager.

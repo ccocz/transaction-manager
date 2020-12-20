@@ -9,6 +9,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 
+/**
+ * Class wraps all information about a transaction.
+ *
+ * @author Resul Hangeldiyev
+ */
 public class Transaction {
 
     private boolean isAborted;
