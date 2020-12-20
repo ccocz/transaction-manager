@@ -12,6 +12,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 
+/**
+ * Using resource allocation graph, we can detect deadlocks and fix it aborting latest
+ * transaction. Also, `AllocationGraph` provides corresponding method to finish a transaction
+ * freeing all the assets it had a disposition with.
+ *
+ * Forementioned methods are thread safe.
+ *
+ * @author Resul Hangeldiyev
+ */
 public class AllocationGraph {
 
     enum Node {
